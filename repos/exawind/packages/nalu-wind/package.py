@@ -10,6 +10,8 @@ from spack.pkg.builtin.nalu_wind import NaluWind as bNaluWind
 from spack.pkg.builtin.kokkos import Kokkos
 import os
 import importlib
+import inspect
+import time
 find_machine = importlib.import_module("find-exawind-manager")
 from spack.pkg.exawind.cmake_extension import *
 
@@ -129,3 +131,23 @@ class NaluWind(CmakeExtension, bNaluWind, ROCmPackage):
             cmake_options.append(self.define("NALU_WIND_REFERENCE_GOLDS_DIR", current_golds))
 
         return cmake_options
+
+    def test(self, spec, prefix):
+        """
+        This method will be used to run regression test
+        """ 
+        spec = self.spec
+        test_env = os.environ.copy()
+
+        with working_dir(self.builder.build_directory):
+            ctest_args = []
+            # Stop tests if they haven't finished in 4-8 hrs (depending on which tests are enabled) so we still get dashboard reporting of build & whatever did run
+            ctest_args.append("--stop-time")
+            overall_test_timeout=60*60*4 # 4 hours
+            ctest_args.append(time.strftime("%H:%M:%S", time.localtime(time.time() + overall_test_timeout)))
+            ctest_args.append("-V")
+            ctest_args.append("--stop-on-failure")
+            # We want the install to succeed even if some tests fail so pass
+            # fail_on_error=False
+            inspect.getmodule(self).ctest(*ctest_args, env=test_env, fail_on_error=False)
+
